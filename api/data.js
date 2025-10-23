@@ -1,38 +1,37 @@
 // /api/data.js
+const CryptoJS = require('crypto-js');
 
-const fetch = require('node-fetch');
+// Paste the encrypted string you got from the encrypt script below
+const encryptedCredentials = 'U2FsdGVkX19UxhK59w+bDyIyOinJWsEwyPN6Lxg6w9ea3AgpsaWtug2oG2Hygheg';
 
-module.exports = async function handler(req, res) {
-  // Replace these with your actual credentials
-  const USERNAME = 'coalition'; // <-- your username
-  const PASSWORD = 'skills-test'; // <-- your password
+// Use the same secret key from your encrypt script
+const secretKey = 'u8F#2K!oX9w&pB*QzZ7eR^vY';
 
-  // Create Basic Auth header
-  const authHeader = 'Basic ' + Buffer.from(`${USERNAME}:${PASSWORD}`).toString('base64');
-
+export default async function handler(req, res) {
   try {
-    // Replace the URL below with your real external API URL
+    // Decrypt credentials
+    const bytes = CryptoJS.AES.decrypt(encryptedCredentials, secretKey);
+    const decrypted = bytes.toString(CryptoJS.enc.Utf8); // "username:password"
+    
+    // Split into username and password
+    const [username, password] = decrypted.split(':');
+
+    // Create Authorization header
+    const authHeader = 'Basic ' + Buffer.from(`${username}:${password}`).toString('base64');
+
+    // Make the external API call
     const response = await fetch('https://fedskillstest.coalitiontechnologies.workers.dev', {
-      headers: {
-        'Authorization': authHeader
-      }
+      headers: { 'Authorization': authHeader }
     });
 
-    // Check if request was successful
     if (!response.ok) {
-      console.error('API responded with status:', response.status);
-      const errorText = await response.text();
-      console.log('Error response:', errorText);
-      return res.status(500).json({ error: 'Error fetching data', status: response.status, detail: errorText });
+      return res.status(500).json({ error: 'Error fetching data', status: response.status });
     }
 
-    // Parse JSON data
     const data = await response.json();
-
-    // Send the data back to the client
     res.status(200).json(data);
-  } catch (error) {
-    console.error('Fetch error:', error);
-    res.status(500).json({ error: 'Error fetching data', message: error.message });
+  } catch (err) {
+    console.error('Error decrypting or fetching:', err);
+    res.status(500).json({ error: 'Failed to decrypt credentials or fetch data' });
   }
-};
+}
